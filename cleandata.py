@@ -2,12 +2,12 @@ def cleandata(file,porcentaje,datos):
     import numpy as np
     import pandas as pd
 
-    with open("JI_GitHub_SIATA/"+file) as f:
+    with open("DIEGO_DATA_PCA/"+file) as f:
         station = f.read().splitlines() #lista con el nombre de los archivos csv
     
     frames = []
     for i in range(len(station)):
-        frames.append(pd.read_csv('JI_GitHub_SIATA/'+station[i]))
+        frames.append(pd.read_csv('DIEGO_DATA_PCA/'+station[i]))
     
     d = pd.concat(frames) 
             
