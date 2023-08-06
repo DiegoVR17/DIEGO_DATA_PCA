@@ -14,7 +14,7 @@ def unify_datetime(d):
     del d['Fecha_Hora']
     del d['fecha_hora']
 
-def clean_data(file, porcentaje, datos):
+def cleandata(file, porcentaje, datos):
     with open("DIEGO_DATA_PCA/" + file) as f:
         station = f.read().splitlines()
 
