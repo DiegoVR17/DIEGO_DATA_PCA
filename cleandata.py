@@ -1,117 +1,65 @@
-def cleandata(file,porcentaje,datos):
-    import numpy as np
-    import pandas as pd
+import numpy as np
+import pandas as pd
 
-    with open("DIEGO_DATA_PCA/"+file) as f:
-        station = f.read().splitlines() #lista con el nombre de los archivos csv
+def unify_datetime(d):
+    if 'Unnamed: 0' in d.columns:
+        d['fecha_hora'] = d['Unnamed: 0'].fillna(d['Fecha_Hora'])
+        del d['Unnamed: 0']
+    elif 'Fecha_Hora' in d.columns:
+        d['fecha_hora'] = d['Fecha_Hora']
+    elif 'Unnamed: 0' in d.columns:
+        d['fecha_hora'] = d['Unnamed: 0']
     
-    frames = []
-    for i in range(len(station)):
-        frames.append(pd.read_csv('DIEGO_DATA_PCA/'+station[i]))
-    
-    d = pd.concat(frames) 
-            
-    if (datos == 1): 
-        #Para algunos datos la fecha y hora estan en 'Unamed 0:' y para otros en 'Fecha_Hora'
-        if (('Unnamed: 0' in d.columns) and ('Fecha_Hora' in d.columns)):
-            d['fecha_hora'] = d['Unnamed: 0'].fillna(d['Fecha_Hora']) #Se unifica la fecha y hora en una columna 'id'
-            d.index = pd.to_datetime(d['fecha_hora']) #Definir como id la fecha y hora
-            del(d['Unnamed: 0'], d['Fecha_Hora'], d['fecha_hora'])
-        elif ('Fecha_Hora' in d.columns):
-            d['fecha_hora'] = d['Fecha_Hora'] #Se unifica la fecha y hora en una columna 'id'
-            d.index = pd.to_datetime(d['fecha_hora']) #Definir como id la fecha y hora
-            del(d['Fecha_Hora'], d['fecha_hora'])
-        elif ('Unnamed: 0' in d.columns):
-            d['fecha_hora'] = d['Unnamed: 0'] #Se unifica la fecha y hora en una columna 'id'
-            d.index = pd.to_datetime(d['fecha_hora']) #Definir como id la fecha y hora
-            del(d['Unnamed: 0'], d['fecha_hora'])
-            
-        k = abs(((d[d==-9999.0]).sum())/9999.0)# Missing values in columns
+    d.index = pd.to_datetime(d['fecha_hora'])
+    del d['Fecha_Hora']
+    del d['fecha_hora']
 
-        to_delete = (k>= (len(d)*(porcentaje/100))).tolist() # Eliminar las columnas que tengan el 10% o mas de datos faltantes
-        columns = d.columns.tolist()
-        index_to_delete = []
-        for i in range(len(to_delete)):
-            if(to_delete[i]):
-                index_to_delete.append(i)
-                index_to_delete.append(i+1)
-        for i in index_to_delete:
-            del(d[columns[i]])
+def clean_data(file, porcentaje, datos):
+    with open("DIEGO_DATA_PCA/" + file) as f:
+        station = f.read().splitlines()
 
-        final_columns = d.columns.tolist()
-        for i in final_columns:
-            if(len(d[(d[i]==-9999.0)])>0):
-                d = d.drop(d[(d[i]==-9999.0)].index.to_list(), axis=0) #Elimnar las filas que tengan datos malos
+    frames = [pd.read_csv('DIEGO_DATA_PCA/' + s) for s in station]
+    d = pd.concat(frames)
 
-        #Matriz con solo las columnas de calidad
-        calidad = d[d.columns[[d.columns.to_list().index(s) for s in d.columns.to_list() if s.__contains__("calidad")]].to_list()]
+    if datos == 1:
+        unify_datetime(d)
 
-        calidad_columns = calidad.columns.tolist()
-        for i in calidad_columns:
-            if(len(d[(d[i]>=2.6)])>0):
-                d = d.drop(d[(d[i]>=2.6)].index.to_list(), axis=0) #Elimnar las filas que tengan datos de calidad malos
-                calidad = calidad.drop(calidad[(calidad[i]>=2.6)].index.to_list(), axis=0)
+        k = abs((d[d == -9999.0]).sum()) / 9999.0
+        to_delete = k >= len(d) * (porcentaje / 100)
 
+        for i, delete in enumerate(to_delete):
+            if delete:
+                del d[d.columns[i]]
+                del d[d.columns[i + 1]]
 
+        d = d[~(d == -9999.0).any(axis=1)]
+        calidad_columns = [col for col in d.columns if 'calidad' in col]
 
-    elif (datos == 2):
-        d.index = pd.to_datetime(d['fecha_hora']) #Definir como id la fecha y hora
-        del(d['fecha_hora'])
-        d = d[d.index.minute == 0] #Obtener los datos cada hora
+        for col in calidad_columns:
+            d = d[~((d[col] >= 2.6) | (d[col] != 1.0))]
 
-        k = abs(((d[d==-999.0]).sum())/999.0)# Missing values in columns
+    elif datos == 2:
+        unify_datetime(d)
+        d = d[d.index.minute == 0]
 
-        to_delete = (k>= (len(d)*(porcentaje/100))).tolist() # Eliminar las columnas que tengan el 10% o mas de datos faltantes
-        columns = d.columns.tolist()
-        index_to_delete = []
-        for i in range(len(to_delete)):
-            if(to_delete[i]):
-                index_to_delete.append(i)
-                index_to_delete.append(i+1)
+        k = abs((d[d == -999.0]).sum()) / 999.0
+        to_delete = k >= len(d) * (porcentaje / 100)
 
-        for i in index_to_delete:
-            del(d[columns[i]])
+        for i, delete in enumerate(to_delete):
+            if delete:
+                del d[d.columns[i]]
+                del d[d.columns[i + 1]]
 
-        final_columns = d.columns.tolist()
-        for i in final_columns:
-            if(len(d[(d[i]==-999.0)])>0):
-              d = d.drop(d[(d[i]==-999.0)].index.to_list(), axis=0) #Elimnar las filas que tengan datos malos
+        d = d[~(d == -999.0).any(axis=1)]
+        calidad_columns = [col for col in d.columns if 'Calidad' in col]
 
-        #Matriz con solo las columnas de calidad
-        calidad = d[d.columns[[d.columns.to_list().index(s) for s in d.columns.to_list() if s.__contains__("Calidad")]].to_list()]
+        for col in calidad_columns:
+            d = d[~((d[col] != 1.0))]
 
-        calidad_columns = calidad.columns.tolist()
-        for i in calidad_columns:
-            if(len(d[(d[i]!=1.0)])>0):
-              d = d.drop(d[(d[i]!=1.0)].index.to_list(), axis=0) #Elimnar las filas que tengan datos de calidad malos
-              calidad = calidad.drop(calidad[(calidad[i]!=1.0)].index.to_list(), axis=0)
-      
-    elif (datos == 3):
-        #Para algunos datos la fecha y hora estan en 'Unamed 0:' y para otros en 'Fecha_Hora'
-        if (('Unnamed: 0' in d.columns) and ('Fecha_Hora' in d.columns)):
-            d['fecha_hora'] = d['Unnamed: 0'].fillna(d['Fecha_Hora']) #Se unifica la fecha y hora en una columna 'id'
-            d.index = pd.to_datetime(d['fecha_hora']) #Definir como id la fecha y hora
-            del(d['Unnamed: 0'], d['Fecha_Hora'], d['fecha_hora'])
-        elif ('Fecha_Hora' in d.columns):
-            d['fecha_hora'] = d['Fecha_Hora'] #Se unifica la fecha y hora en una columna 'id'
-            d.index = pd.to_datetime(d['fecha_hora']) #Definir como id la fecha y hora
-            del(d['Fecha_Hora'], d['fecha_hora'])
-        elif ('Unnamed: 0' in d.columns):
-            d['fecha_hora'] = d['Unnamed: 0'] #Se unifica la fecha y hora en una columna 'id'
-            d.index = pd.to_datetime(d['fecha_hora']) #Definir como id la fecha y hora
-            del(d['Unnamed: 0'], d['fecha_hora'])
-
-        #Delete all columns except pm25 and calidad_pm25
-        columns_to_delete = d.columns.to_list()
-        del columns_to_delete[1:3] #We don't want delete pm25 and calidad_pm25
-        d = d.drop(columns=columns_to_delete)
-
-        #Delete pm25 rows that have -9999.0
-        if(len(d[(d['pm25']==-9999.0)])>0):
-            d = d.drop(d[(d['pm25']==-9999.0)].index.to_list(), axis=0)
-
-        #Delete calidad_pm25 rows where are higher than 2.6
-        if(len(d[(d['calidad_pm25']>=2.6)])>0):
-            d = d.drop(d[(d['calidad_pm25']>=2.6)].index.to_list(), axis=0)
+    elif datos == 3:
+        unify_datetime(d)
+        d = d[['pm25', 'calidad_pm25']]
+        d = d[~(d['pm25'] == -9999.0)]
+        d = d[~(d['calidad_pm25'] >= 2.6)]
 
     return d
